@@ -132,7 +132,9 @@ async def test_put_compression(s3_client: S3Client, s3_read, object_name):
             yield i.to_bytes(1, sys.byteorder)
 
     data = b"hello, world"
-    resp = await s3_client.put(object_name, async_iterable(data), compress="gzip")
+    resp = await s3_client.put(
+        object_name, async_iterable(data), compress="gzip"
+    )
     assert resp.status == HTTPStatus.OK
 
     result = await s3_read()

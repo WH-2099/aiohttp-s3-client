@@ -13,7 +13,6 @@ from mmap import PAGESIZE
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.parse import quote
-from yarl import URL
 
 from aiohttp import ClientSession, hdrs
 
@@ -52,7 +51,9 @@ threaded_iterable_constrained = threaded_iterable(max_size=2)
 
 
 class AwsError(ClientResponseError):
-    def __init__(self, resp: ClientResponse, message: str, *history: ClientResponse):
+    def __init__(
+        self, resp: ClientResponse, message: str, *history: ClientResponse
+    ):
         super().__init__(
             headers=resp.headers,
             history=(resp, *history),
@@ -206,8 +207,10 @@ class S3Client:
 
         if kwargs.get("chunked"):
             if content_sha256:
-                log.warning("content_sha256 will be ignored because content is chunked")
-            # https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
+                log.warning(
+                    "content_sha256 will be ignored because content is chunked"
+                )
+            # https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html  # noqa: E501
             content_sha256 = "STREAMING-UNSIGNED-PAYLOAD-TRAILER"
 
         if data is not None and content_sha256 is None:
@@ -296,8 +299,12 @@ class S3Client:
         data: t.Union[bytes, str, t.AsyncIterable[bytes]],
         **kwargs,
     ) -> RequestContextManager:
-        headers = self._prepare_headers(kwargs.pop("headers", None), str(object_name))
-        return self.request("PUT", object_name, headers=headers, data=data, **kwargs)
+        headers = self._prepare_headers(
+            kwargs.pop("headers", None), str(object_name)
+        )
+        return self.request(
+            "PUT", object_name, headers=headers, data=data, **kwargs
+        )
 
     def post(
         self,
@@ -305,8 +312,12 @@ class S3Client:
         data: t.Union[None, bytes, str, t.AsyncIterable[bytes]] = None,
         **kwargs,
     ) -> RequestContextManager:
-        headers = self._prepare_headers(kwargs.pop("headers", None), str(object_name))
-        return self.request("POST", object_name, headers=headers, data=data, **kwargs)
+        headers = self._prepare_headers(
+            kwargs.pop("headers", None), str(object_name)
+        )
+        return self.request(
+            "POST", object_name, headers=headers, data=data, **kwargs
+        )
 
     def put_file(
         self,
@@ -587,10 +598,11 @@ class S3Client:
             self._parts_generator(gen, workers_count, parts_queue),
         )
         try:
-            part_no, *_ = await asyncio.gather(
+            results = await asyncio.gather(
                 parts_generator,
                 *workers,
             )
+            part_no = t.cast(int, results[0])
         except Exception:
             for task in chain([parts_generator], workers):
                 if not task.done():
@@ -601,7 +613,7 @@ class S3Client:
             "All parts (#%d) of %s are uploaded to %s",
             part_no - 1,
             upload_id,
-            object_name,  # type: ignore
+            object_name,
         )
 
         # Parts should be in ascending order
@@ -629,7 +641,9 @@ class S3Client:
         """
         headers = self._make_headers(headers)
 
-        headers["x-amz-copy-source"] = quote((self._url / src_object_key.removeprefix("/")).path)
+        headers["x-amz-copy-source"] = quote(
+            (self._url / src_object_key.removeprefix("/")).path
+        )
 
         if replace_metadata or (hdrs.CONTENT_TYPE in headers):
             headers["x-amz-metadata-directive"] = "REPLACE"
@@ -640,7 +654,10 @@ class S3Client:
 
         # CopyObject has an empty payload
         return self.request(
-            "PUT", dst_object_key, headers=headers, content_sha256=EMPTY_STR_HASH
+            "PUT",
+            dst_object_key,
+            headers=headers,
+            content_sha256=EMPTY_STR_HASH,
         )
 
     async def rename(
@@ -650,7 +667,10 @@ class S3Client:
         *,
         headers: t.Optional[HeadersType] = None,
         replace_metadata: bool = False,
-        delete_ok_statuses: t.Tuple[int, ...] = (HTTPStatus.NO_CONTENT, HTTPStatus.OK),
+        delete_ok_statuses: t.Tuple[int, ...] = (
+            HTTPStatus.NO_CONTENT,
+            HTTPStatus.OK,
+        ),
         **kwargs,
     ) -> None:
         """
